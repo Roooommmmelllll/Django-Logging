@@ -63,4 +63,4 @@ DO NOT FORGET TO SAVE AND CLOSE THE FILE
 - - > python manage.py statapp appname
 
 - > Creates a directory with the desired appname
-- > For the example app I am following, the app will use "polls"
+- > For the example the instructions that I am following will use "polls"
