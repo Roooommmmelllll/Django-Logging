@@ -243,6 +243,7 @@ A set of the Django experiments I've done/ am working on involving logging
 				raise Http404("Question does not exist")
 			return render(request, 'polls/detail.html', {'question': question})
 - But again, now  that you've seen the more difficult method, know that Django has a shortcut for 404 Errors.
+	- **"pk"** in the **".get"** command stands for and is a shortcut for Primary Key
 - Edit the **"polls/views.py"** to now show:
 
 		from django.shortcuts import render, get_object_or_404
@@ -300,3 +301,143 @@ A set of the Django experiments I've done/ am working on involving logging
 			<p>No polls are available.</p>
 		{% endif %}
 ## Creating Forms
+- Lets build on what is already existing, and edit the template to contain an HTML **< form >** element.
+- Edit the **"polls/templates/polls/detail.html"** file to use a form:
+
+		<h1>{{ question.question_text }}</h1>
+		
+		{% if error_message %}<p><strong>{{ error_message }}</strong></p>{% endif %}
+
+		<form action="{% url 'polls:vote' question.id %}" method="post">
+		{% csrf_token %}
+		{% for choice in question.choice_set.all %}
+			<input type="radio" name="choice" id="choice{{ forloop.counter }}" value="{{ choice.id }}"
+			<label for="choice{{ forloop.counter }}">{{ choice.choice_text }}</label>
+		<br />
+		{% endfor %}
+		<input type="submit" value="vote" />
+		</form>
+- A rundown of all the parts of this form.
+	* This template uses radio buttons for each question choice.
+	* The value for each radio button is the associated question choice's ID.
+	* The POST data from each radio button submits choice=# where # is the ID of the selected choice.
+	* This is the basic concept of how HTML forms work.
+	* The form has 2 attributes that need to be defined: action and method.
+		* The **action** attribute specifies where to send the form data when the form is submitted.
+			* Normally the action attribute uses an absolute URL, pointing to some website
+			* It can however, also use a relative URL, pointing to a file within the website
+		* The **method** attribute is important, but can only store one of two values: get and post
+			* The **get** is default, and appends the form-data to the IRL in the action attribute
+			* The **post** sends the form-data fas an HTTP post transaction
+	* Since the form creates a POST, that can modify data, we need to worry about Cross Site Request Forgeries.
+		* Luckily, Django handles all of that by adding the template tag:
+			
+				{% csrf_token %}
+- Now let's create a Django view that handles the submitted data and does something with it.
+- Edit the **"polls/views.py"** so that the vote now looks like:
+		
+		from django.shortcuts import get_object_or_404, render
+		from django.http import HTTPResponseRedirect, HttpResponse
+		from django.core.urlresolvers import reverse
+
+		from .models import Choice, Question
+
+		#...
+		
+		def vote(request, question_id):
+			p = get_object_or_404(Question, pk=question_id)
+			try:
+				selected_choice = p.choice_set.get(pk=request.POST['choice'])
+			except (KeyError, Choice.DoesNotExist):
+				# Redisplay the question voting form.
+				return render(request, 'polls/detail.html',{
+					'question': p,
+					'error_message': "You didn't select a choice.",
+				})
+			else:
+				selected_choice.votes += 1
+				selected_choice.save()
+				# Always return an HttpResponseRedirect after successfully dealing
+				# with POST data. This prevents data from being posted twice if a
+				# user hits the Back button.
+				return HttpResponseRedirect(reverse('polls:results', args=(p.id,)))
+- A rundown of the parts of the changes made to the **"polls/views.py"** file.
+	* **"request.POST"** is an object that lets you access the submitted data by key name.
+		* In the example, 
+				
+				request.POST['choice']
+		* This returns the ID of the selected choice, as a string. Note that **"request.POST"** always returns a string.
+	* In the case that there is no POST data provided, a **"KeyError"** will be called, and the result will be a redisplaying of the question form with an error message.
+	* Note the section towards the end of the file that returns an HttpResponseRedirect.
+		* This should always be done when dealing with POST data, not so much because of Django, but because it's good Web development practice.
+- Now that the vote is handled, there must be the results page that it redirects to.
+- Edit the **"polls/views.py"** so that the result now looks like:
+
+		from django.shortcuts import get_object_or_404, render
+		from django.http import HTTPResponseRedirect, HttpResponse
+		from django.core.urlresolvers import reverse
+
+		from .models import Choice, Question
+
+		#...
+		def results(request, question_id):
+			question = get_object_or_404(Question, pk=question_id)
+			return render(request, 'polls/results.html', {question': question})
+- Now to create the template for this view.
+- Edit the **"polls/templates/polls/results.html"** file to look like:
+
+		<h1>{{ question.question_texxt }}</h1>
+
+		<ul>
+		{% for choice in question.choice_set.all %}
+			<li>{{ choice.choice_text }} -- {{ choice.votes }} vote {{ choice.votes|pluralize }}</li>
+		{% endfor %}
+		</ul>
+
+		<a href ="{% url 'polls:detail' question.id %}">Vote again?</a>
+## Using Generic Views
+- Since several of the views used represent common cases of basic Web Development, Django provides a shortcut for them, called the "generic views" system.
+- Amend the **"polls/urls.py"** to now look like:
+
+		from django.conf.urls import url
+
+		from . import views
+
+		urlpatterns = [
+			# ex: /polls/
+			url(r'^$', views.IndexView.as_view(), name='index'),
+			# ex: /polls/1/
+			url(r'^(?P<pk>[0-9]+)/$', views.DetailView.as_view(), name='detail'),
+			# ex: /polls/1/results/
+			url(r'^(?P<pk>[0-9]+)/results/$', views.ResultsView.as_view(), name='results'),
+			# ex: /polls/1/vote/
+			url(r'^(?P<question_id>[0-9]+)/vote/$', views.vote, name='vote'),
+		]
+- Note the changes to the linked view and the changes in URL form for the second and third url pattern.
+- Amend the **"polls/views.py"** to now look like:
+
+		django.shortcuts import get_objects_or_404, render
+		django.http import HttpResponseRedirect
+		django.core.urlresolvers import reverse
+		django.views import generic
+
+		from .models import Choice, Question
+
+		class IndexView(generic.ListView):
+			template_name = 'polls/index.html'
+			context_object_name = 'latest_question_list'
+
+			def get_queryset(self):
+				"""Return the last five published questions."""
+				return Question.objects.order_by('-pub_date')[:5]
+		
+		class DetailView(generic.DetailView):
+			model = Question
+			template_name = 'polls/detail.html'
+
+		class ResultsView(generic.DetailView):
+			model = Question
+			template_name = 'polls/results.html'
+
+		def vote(request, question_id):
+			#same as before, no changes.
