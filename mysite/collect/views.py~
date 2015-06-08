@@ -1,0 +1,19 @@
+from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponseRedirect
+from django.core.urlresolvers import reverse
+
+from .models import Query
+
+# Create your views here.
+
+def index(request):
+    all_query_list = Query.objects.order_by('tally')
+    context = { 'all_query_list': all_query_list}
+    return render(request, 'collect/index.html', context)
+
+def vote(request, query_id):
+    if request.method == 'POST':
+        p = get_object_or_404(Query, pk=query_id)
+        p.tally+=1
+    else:
+        return HttpResponseRedirect(reverse('collect:index', args=(p.id)))

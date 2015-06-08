@@ -1,0 +1,15 @@
+{% if all_query_list %}
+<ul>
+  {% for query in all_query_list %}
+  <li>
+    {{ query.query_text }}
+    <form action = "{% url 'collect:vote' query.id %}" method="post">
+    {% csrf_token %}
+    <input type = "submit" value="VOTE"/>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+  {% else %}
+    <p>No polls are available.</p>
+{% endif %}
