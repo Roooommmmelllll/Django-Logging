@@ -1,6 +1,9 @@
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.core.urlresolvers import reverse
+import datetime
+import logging
+logger = logging.getLogger(__name__)
 
 from .models import Choice, Question
 
@@ -31,8 +34,13 @@ def vote(request, question_id):
         })
     else:
         selected_choice.votes += 1
+        logdata(question_id, selected_choice, request.session)
         selected_choice.save()
         #Always return an HttpResponseRedirect after successfully dealing
         #with POST data. This prevents data from being posted twice if a
         #user hits the Back button.
         return HttpResponseRedirect(reverse('polls:results', args=(p.id,)))
+
+def logdata(question_id, choice, session):
+    session.modified=True
+    logger.info(str(datetime.datetime.now())[:19]+"-"+str(session.session_key)+"-"+str(question_id)+"-"+str(choice))
